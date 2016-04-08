@@ -46,12 +46,12 @@ class SingleLogicContainer extends React.Component {
   }
   render() {
     const props = {
-      dialogOptions: {
-        open: this.state.dialogOpen,
-        onChange: this.handleSessionIdChange,
-        onKeyDown: this.handleSessionIdInputKey,
-        onTouchTap: this.fetchSession,
-      },
+      // dialogOptions: {
+      //   open: this.state.dialogOpen,
+      //   onChange: this.handleSessionIdChange,
+      //   onKeyDown: this.handleSessionIdInputKey,
+      //   onTouchTap: this.fetchSession,
+      // },
       sliderOptions: {
         min: config.productionCost,
         max: config.retailPrice,

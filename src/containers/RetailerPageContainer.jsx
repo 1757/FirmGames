@@ -1,120 +1,56 @@
-import React from 'react';
-import Firebase from 'firebase';
-import _ from 'lodash';
+import React, { PropTypes } from 'react';
 
 import config from 'src/config';
 import Page from 'src/components/Page';
 
-class RetailerLogicContainer extends React.Component {
+class RetailerPageContainer extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      sessionId: null,
-      currentWholesalePrice: null,
-      currentQuantity: null,
-      optimalQuantity: null,
-      expectedRetailerProfit: null,
-      expectedSupplierProfit: null,
-      bids: {},
-      dialogOpen: true,
+      quantity: null,
     };
-    this.onQuantityChange = this.onQuantityChange.bind(this);
-    this.onBidSubmit = this.onBidSubmit.bind(this);
-    this.handleSessionIdChange = this.handleSessionIdChange.bind(this);
-    this.handleSessionIdInputKey = this.handleSessionIdInputKey.bind(this);
-    this.handleBidSnapshot = this.handleBidSnapshot.bind(this);
-    this.fetchSession = this.fetchSession.bind(this);
+    this.handleQuantityChange = this.handleQuantityChange.bind(this);
+    this.handleBidSubmit = this.handleBidSubmit.bind(this);
   }
-  componentDidMount() {
-    this.firebaseRef = new Firebase(`${config.firebaseRoot}games`);
-    this.gameRef = null;
-    this.bidsRef = null;
-    this.currentBidRef = null;
+  handleQuantityChange(event, newQuantity) {
+    this.setState({ quantity: newQuantity });
   }
-  onQuantityChange(event, newQuantity) {
-    this.setState({ currentQuantity: newQuantity });
-  }
-  onBidSubmit() {
-    if (!this.bidsRef) {
-      return alert('Database not available');
-    }
-    if (!this.currentBidRef) {
-      return alert('Not your turn');
-    }
+  handleBidSubmit() {
     const demand = Math.ceil(100 * Math.random());
-    const currentWholesalePrice = this.state.bids[this.currentBidRef.key()]['Wholesale Price'];
+    const quantity = this.state.quantity;
+    const currentWholesalePrice = this.props.currentBidSnapshot.val()['Wholesale Price'];
     const bid = {
       Completed: true,
       'Wholesale Price': currentWholesalePrice,
-      Quantity: this.state.currentQuantity,
+      Quantity: quantity,
       Demand: demand,
-      'Retailer Profit': config.retailPrice * demand
-                            - currentWholesalePrice * this.state.currentQuantity,
-      'Supplier Profit': (currentWholesalePrice - config.productionCost)
-                          * this.state.currentQuantity,
+      'Retailer Profit': config.retailPrice * demand - currentWholesalePrice * quantity,
+      'Supplier Profit': (currentWholesalePrice - config.productionCost) * quantity,
     };
-    return this.currentBidRef.set(bid);
-  }
-  handleBidSnapshot(snapshot) {
-    const bid = {};
-    bid[snapshot.key()] = snapshot.val();
-    if (!snapshot.val().Completed) {
-      this.currentBidRef = snapshot.ref();
-    } else {
-      this.currentBidRef = null;
-    }
-    this.setState({
-      bids: _.assign({}, this.state.bids, bid),
-    });
-  }
-  handleSessionIdChange(event, value) {
-    this.setState({ sessionId: value });
-  }
-  handleSessionIdInputKey(event) {
-    if (event.keyCode === 13) {
-      this.fetchSession();
-    }
-  }
-  fetchSession() {
-    this.firebaseRef
-      .orderByChild('id')
-      .equalTo(this.state.sessionId)
-      .once('child_added')
-      .then(snapshot => {
-        if (snapshot.exists()) {
-          const ref = snapshot.ref();
-          console.log(ref.toString());
-          this.gameRef = ref;
-          this.bidsRef = ref.child('bids');
-          this.bidsRef.on('child_added', this.handleBidSnapshot);
-          this.bidsRef.on('child_changed', this.handleBidSnapshot);
-          this.setState({ dialogOpen: false });
-        } else {
-          alert('Session does not exist');
-        }
-      });
+    this.props.handleBidSubmit(bid);
   }
   render() {
+    let isTurn;
+    const snapshot = this.props.currentBidSnapshot;
+    if (!snapshot) {
+      isTurn = false;
+    } else {
+      isTurn = !snapshot.val().Completed;
+    }
     const props = {
-      dialogOptions: {
-        open: this.state.dialogOpen,
-        onChange: this.handleSessionIdChange,
-        onKeyDown: this.handleSessionIdInputKey,
-        onTouchTap: this.fetchSession,
-      },
       sliderOptions: {
         min: config.minimumQuantity,
         max: config.maximumQuantity,
         defaultValue: config.defaultQuantity,
         step: config.quantityStep,
-        description: `Quantity: ${this.state.currentQuantity}`,
-        onChange: this.onQuantityChange,
+        description: `Quantity: ${this.state.quantity}`,
+        onChange: this.handleQuantityChange,
       },
       buttonOptions: {
-        disabled: !this.currentBidRef,
-        onTouchTap: this.onBidSubmit,
+        disabled: !isTurn,
+        onTouchTap: this.handleBidSubmit,
       },
-      bids: _.values(this.state.bids),
+      bids: this.props.bids,
     };
     return (
       <Page {...props} />
@@ -122,4 +58,10 @@ class RetailerLogicContainer extends React.Component {
   }
 }
 
-module.exports = RetailerLogicContainer;
+RetailerPageContainer.propTypes = {
+  handleBidSubmit: PropTypes.func.isRequired,
+  currentBidSnapshot: PropTypes.object,
+  bids: PropTypes.array.isRequired,
+};
+
+module.exports = RetailerPageContainer;
